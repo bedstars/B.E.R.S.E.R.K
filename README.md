@@ -71,7 +71,7 @@ All of them can be changed in *Options > Controls > B.E.R.S.E.R.K* (macros) and 
 ## Path editor
 
 Open it with `K` or from the **PATH** tab of the menu. Click to lay down points, watch every line show its length and
-coordinates, then hit **RUN** (or press `J`). The player walks the route using only `W` `A` `S` `D` and sprint - **the camera is never touched**.
+coordinates, then hit **RUN** (or press `J`). The player walks the route using `W` `A` `S` `D` and sprint. **The camera only moves where a point tells it to** (see below).
 
 | Action | How |
 |---|---|
@@ -80,12 +80,20 @@ coordinates, then hit **RUN** (or press `J`). The player walks the route using o
 | Close the loop | Click the START point |
 | Axis lock | `F8` (or the ORTHO button) |
 | Select / move a point | `SELECT` tool (`S`), click, drag to move |
-| Edit coordinates / command | Select a point, open **PROPERTIES** (`P`), click a field, type, `Enter` |
+| Edit coordinates / camera / command | Select a point, open **PROPERTIES** (`P`), click a field, type, `Enter` |
 | Insert a point into a line | `SELECT` tool, `Shift` + click the line |
 | Delete a point | `Del` |
 | Pan / zoom | Middle mouse drag or arrow keys / mouse wheel |
 | Fit route / centre on you | `F` / `C` |
 | Leave | `Esc` |
+
+**Camera at a point:** every point has optional `YAW` and `PIT` fields (yaw like F3: `0` south, `90` west, `180` north, `-90` east;
+pitch `-90` up to `90` down). Once the player reaches the point the camera eases smoothly to that view, taking the short way
+round. A field left empty is never touched, so the camera stays wherever it is. `USE MY VIEW` copies your current camera into the
+point and `CLEAR VIEW` empties both fields. Points with a camera or command show `CAM` / `/CMD` on the map.
+
+**Tabbing out:** `Left Alt` (free mouse) works while a path walks and inside the editor. Real mouse input is ignored and the game
+does not pause when the window loses focus, so you can use other windows while the route keeps running.
 
 Five route slots, optional commands that run when the player stands on a point, sprint and repeat toggles. At a command point the
 player stops dead, runs it, waits `cmdDelay` ticks and carries on. Opening any screen pauses the walk. If START is more than

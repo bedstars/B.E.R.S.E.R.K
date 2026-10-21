@@ -619,7 +619,7 @@ public final class Engine {
     /** While a macro plays (or the mouse is free) the game must not pause when the window loses focus. */
     private static void refreshBackground(Minecraft mc) {
         if (!Config.I.mBackground) return;
-        boolean on = mode == Mode.PLAYING || Input.freeMouse;
+        boolean on = mode == Mode.PLAYING || Walker.running || Input.freeMouse;
         try {
             if (!pauseLooked) {
                 pauseLooked = true;

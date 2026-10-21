@@ -145,7 +145,7 @@ public final class BerserkScreen extends Screen {
             Ui.text(g, ch, tx, py + 8, Ui.lerp(Ui.ACCENT, Ui.ACCENT2, (float) i / (title.length() - 1)));
             tx += Ui.tw(ch) + 2;
         }
-        Ui.text(g, "v1.2", tx + 4, py + 9, Ui.DIM);
+        Ui.text(g, "v1.3", tx + 4, py + 9, Ui.DIM);
 
         int closeX = px + pw - 22, playX = closeX - 54, recX = playX - 54;
         boolean recOn = Engine.mode == Engine.Mode.RECORDING, playOn = Engine.mode == Engine.Mode.PLAYING;
@@ -392,12 +392,14 @@ public final class BerserkScreen extends Screen {
             if (Walker.running) Scr.set(m, null);
         });
         if (in(mx, my, cx, y, bw, 18)) hoverDesc = "Draw a route on a 1000 x 1000 block grid and pick one of 5 route slots.";
-        if (in(mx, my, cx + bw + 6, y, bw, 18)) hoverDesc = "Walk the current route with W A S D only. Cannot run together with a macro.";
+        if (in(mx, my, cx + bw + 6, y, bw, 18)) hoverDesc = "Walk the current route with W A S D. The camera only turns where a point sets it. Not together with a macro.";
         y += 26;
 
         Ui.text(g, "Keys: " + keyName(PathMod.K_EDIT) + " = editor, " + keyName(PathMod.K_RUN) + " = start / stop", cx + 2, y, Ui.DIM);
         y += 14;
-        Ui.text(g, "The path walker never touches the camera.", cx + 2, y, Ui.DIM);
+        Ui.text(g, "Each point can turn the camera (YAW / PIT in PROPERTIES).", cx + 2, y, Ui.DIM);
+        y += 14;
+        Ui.text(g, "Left Alt frees the mouse - the walk keeps running unfocused.", cx + 2, y, Ui.DIM);
         y += 14;
         return y + scroll[2] - cy;
     }

@@ -43,6 +43,7 @@ public final class PathMod {
 
     private static void onStartTick(Minecraft mc) {
         PathInput.ensure();
+        Walker.camTick(mc);
         Walker.tick(mc);
     }
 

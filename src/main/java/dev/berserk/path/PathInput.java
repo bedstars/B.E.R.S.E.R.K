@@ -93,7 +93,8 @@ public final class PathInput {
     private static void onKey(long w, int key, int sc, int action, int mods) {
         try {
             PathScreen ps = screen();
-            if (ps != null && action != GLFW.GLFW_RELEASE) {
+            // the free-mouse key (Left Alt) is not ours: let it reach the macro mod's hook so it works in the editor too
+            if (ps != null && action != GLFW.GLFW_RELEASE && !dev.berserk.Input.isFreeKey(key)) {
                 ps.onKey(key, action, mods);
                 return;
             }

@@ -151,6 +151,11 @@ public final class Input {
         }
     }
 
+    /** True when {@code key} is the free-mouse key (Left Alt by default). Used by the path editor's hook. */
+    public static boolean isFreeKey(int key) {
+        return match(Berserk.K_FREE, key, GLFW.GLFW_KEY_LEFT_ALT);
+    }
+
     private static boolean match(KeyMapping m, int key, int def) {
         if (m == null) return false;
         int c = keyOf(m);

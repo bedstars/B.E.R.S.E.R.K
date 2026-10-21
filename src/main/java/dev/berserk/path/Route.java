@@ -31,6 +31,8 @@ public final class Route {
     public static final class Pt {
         public double x, z;
         public String cmd = "";
+        /** Camera to ease to once this point is reached. null = leave that axis alone. */
+        public Double yaw, pitch;
 
         public Pt() {}
 
@@ -38,6 +40,14 @@ public final class Route {
             this.x = x;
             this.z = z;
         }
+    }
+
+    /** Wraps an angle into [-180, 180). */
+    public static double wrapYaw(double a) {
+        a %= 360.0;
+        if (a >= 180.0) a -= 360.0;
+        if (a < -180.0) a += 360.0;
+        return a;
     }
 
     public int n() {

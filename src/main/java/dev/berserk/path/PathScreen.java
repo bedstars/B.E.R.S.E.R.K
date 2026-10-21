@@ -20,7 +20,7 @@ import java.util.Locale;
 public final class PathScreen extends Screen {
     private enum Tool { DRAW, SELECT }
 
-    private enum Field { NONE, X, Z, CMD }
+    private enum Field { NONE, X, Z, YAW, PITCH, CMD }
 
     private record Hit(int x, int y, int w, int h, Runnable r) {
         boolean in(double a, double b) {
@@ -139,7 +139,7 @@ public final class PathScreen extends Screen {
         clampView();
         panelX = width - PW - 6;
         panelY = tbH + 6;
-        panelH = selPt() != null ? 142 : 56;
+        panelH = selPt() != null ? 200 : 56;
     }
 
     private void clampView() {
@@ -417,6 +417,8 @@ public final class PathScreen extends Screen {
         return switch (f) {
             case X -> num(p.x);
             case Z -> num(p.z);
+            case YAW -> p.yaw == null ? "" : num(p.yaw);
+            case PITCH -> p.pitch == null ? "" : num(p.pitch);
             case CMD -> p.cmd;
             default -> "";
         };
@@ -442,6 +444,8 @@ public final class PathScreen extends Screen {
             switch (f) {
                 case X -> p.x = r.clampX(Double.parseDouble(s));
                 case Z -> p.z = r.clampZ(Double.parseDouble(s));
+                case YAW -> p.yaw = s.isEmpty() ? null : Double.valueOf(Route.wrapYaw(Double.parseDouble(s)));
+                case PITCH -> p.pitch = s.isEmpty() ? null : Double.valueOf(Math.max(-90.0, Math.min(90.0, Double.parseDouble(s))));
                 case CMD -> p.cmd = s;
                 default -> {
                 }
@@ -805,9 +809,9 @@ public final class PathScreen extends Screen {
 
             if (scale >= 1.2 || isSel || isHov) {
                 String role = r.role(i);
-                String l1 = (role.equals("POINT") ? "P" + (i + 1) : role + "  P" + (i + 1)) + (p.cmd.isBlank() ? "" : "   /CMD");
+                String l1 = (role.equals("POINT") ? "P" + (i + 1) : role + "  P" + (i + 1)) + (p.cmd.isBlank() ? "" : "   /CMD") + (p.yaw != null || p.pitch != null ? "   CAM" : "");
                 int tx = px + 8, ty = py - 24;
-                tag(g, l1, tx, ty, p.cmd.isBlank() ? col : Ui.ORANGE);
+                tag(g, l1, tx, ty, p.cmd.isBlank() && p.yaw == null && p.pitch == null ? col : Ui.ORANGE);
                 tag(g, coords(p), tx, ty + 11, Ui.TEXT);
             }
         }
@@ -909,13 +913,18 @@ public final class PathScreen extends Screen {
     // ------------------------------------------------------------------ properties panel
 
     private void fieldRow(GuiGraphicsExtractor g, String label, Field f, String value, int y) {
+        fieldRow(g, label, f, value, y, null);
+    }
+
+    private void fieldRow(GuiGraphicsExtractor g, String label, Field f, String value, int y, String hint) {
         int bx = panelX + 32, bw = PW - 40;
         Ui.text(g, label, panelX + 8, y + 3, Ui.DIM);
         boolean on = editing == f;
         Ui.rr(g, bx, y, bw, 14, on ? 0xFF0E1420 : Ui.CARD);
         Ui.border(g, bx, y, bw, 14, on ? Ui.CYAN : Ui.LINE);
         String shown = on ? buf + ((System.currentTimeMillis() / 450) % 2 == 0 ? "_" : " ") : value;
-        Ui.text(g, Ui.fit(shown, bw - 8), bx + 4, y + 3, on ? Ui.TEXT : Ui.TEXT);
+        if (!on && value.isEmpty() && hint != null) Ui.text(g, hint, bx + 4, y + 3, Ui.DIM);
+        else Ui.text(g, Ui.fit(shown, bw - 8), bx + 4, y + 3, Ui.TEXT);
         hits.add(new Hit(bx, y, bw, 14, () -> startEdit(f)));
     }
 
@@ -953,14 +962,35 @@ public final class PathScreen extends Screen {
         y += 18;
         fieldRow(g, "Z", Field.Z, num(p.z), y);
         y += 18;
+        fieldRow(g, "YAW", Field.YAW, p.yaw == null ? "" : num(p.yaw), y, "keep current");
+        y += 18;
+        fieldRow(g, "PIT", Field.PITCH, p.pitch == null ? "" : num(p.pitch), y, "keep current");
+        y += 18;
         fieldRow(g, "CMD", Field.CMD, p.cmd, y);
         y += 18;
-        Ui.text(g, "Runs when the player reaches", panelX + 8, y, Ui.DIM);
-        Ui.text(g, "this exact point.", panelX + 8, y + 10, Ui.DIM);
-        y += 24;
+        Ui.text(g, "Camera eases to YAW / PIT on", panelX + 8, y, Ui.DIM);
+        Ui.text(g, "arrival. Empty = unchanged.", panelX + 8, y + 10, Ui.DIM);
+        Ui.text(g, "CMD runs once on the point.", panelX + 8, y + 20, Ui.DIM);
+        y += 34;
         panelBtn(g, "DELETE", panelX + 8, y, 74, 0xFFB01B2E, this::deleteSelected);
         panelBtn(g, "CLEAR CMD", panelX + 86, y, 78, Ui.CARD_HI, () -> {
             p.cmd = "";
+            editing = Field.NONE;
+            Route.save();
+        });
+        y += 18;
+        panelBtn(g, "USE MY VIEW", panelX + 8, y, 82, Ui.CARD_HI, () -> {
+            Minecraft m = Minecraft.getInstance();
+            if (m.player == null) return;
+            p.yaw = Math.round(Route.wrapYaw(m.player.getYRot()) * 10.0) / 10.0;
+            p.pitch = Math.round(Math.max(-90.0, Math.min(90.0, (double) m.player.getXRot())) * 10.0) / 10.0;
+            editing = Field.NONE;
+            Route.save();
+            flash("Camera set to your current view");
+        });
+        panelBtn(g, "CLEAR VIEW", panelX + 94, y, 70, Ui.CARD_HI, () -> {
+            p.yaw = null;
+            p.pitch = null;
             editing = Field.NONE;
             Route.save();
         });

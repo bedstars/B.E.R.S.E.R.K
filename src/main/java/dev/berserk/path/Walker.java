@@ -30,6 +30,8 @@ public final class Walker {
     private static boolean pressed;  // we are holding keys
     private static boolean paused;
     private static double ex, ez;    // direction error carried to the next tick (error diffusion)
+    private static boolean camActive, keepCam;  // easing the camera towards the last reached point's view
+    private static Double camYaw, camPitch;
 
     // ------------------------------------------------------------------ control
 
@@ -61,6 +63,7 @@ public final class Walker {
         started = false;
         wait = 0;
         paused = false;
+        camActive = false;
         ex = 0;
         ez = 0;
         ax = mc.player.getX();
@@ -72,6 +75,7 @@ public final class Walker {
     public static void stop(Minecraft mc, String why) {
         boolean was = running;
         running = false;
+        if (!keepCam) camActive = false;
         release(mc);
         if (was && mc != null && why != null) Msg.overlay(mc, Msg.S + "e" + why);
     }
@@ -251,6 +255,12 @@ public final class Walker {
         ax = t.x;
         az = t.z;
 
+        if (t.yaw != null || t.pitch != null) { // turn the camera here, smoothly (see camTick)
+            camYaw = t.yaw;
+            camPitch = t.pitch;
+            camActive = true;
+        }
+
         boolean finish = false;
         if (r.closed) {
             if (i == 0 && started) {
@@ -287,6 +297,67 @@ public final class Walker {
             Msg.send(mc, t.cmd);
             wait = Math.max(1, Cfg.I.cmdDelay);
         }
-        if (finish) stop(mc, "Path finished");
+        if (finish) {
+            keepCam = true; // let the last camera turn finish
+            stop(mc, "Path finished");
+            keepCam = false;
+        }
+    }
+
+    // ------------------------------------------------------------------ camera
+
+    /**
+     * Eases the camera towards the yaw / pitch of the last point we reached. Called every tick (also
+     * after the route finished). An empty axis is never touched. Open screens make it wait.
+     */
+    public static void camTick(Minecraft mc) {
+        if (!camActive) return;
+        if (mc.player == null || mc.level == null) {
+            camActive = false;
+            return;
+        }
+        if (Scr.get(mc) != null) return;
+        var pl = mc.player;
+        float cy = pl.getYRot(), cp = pl.getXRot();
+        float ny = cy, np = cp;
+        boolean done = true;
+        if (camYaw != null) {
+            float d = wrapDeg(camYaw.floatValue() - cy); // shortest way round, never a 360 degree spin
+            if (Math.abs(d) > 0.15f) {
+                ny = cy + ease(d);
+                done = false;
+            } else {
+                ny = cy + d;
+            }
+        }
+        if (camPitch != null) {
+            float d = Math.max(-90f, Math.min(90f, camPitch.floatValue())) - cp;
+            if (Math.abs(d) > 0.15f) {
+                np = cp + ease(d);
+                done = false;
+            } else {
+                np = cp + d;
+            }
+        }
+        pl.yRotO = cy; // the game interpolates between ticks, so the turn looks smooth
+        pl.xRotO = cp;
+        pl.setYRot(ny);
+        pl.setXRot(np);
+        if (done) camActive = false;
+    }
+
+    /** One tick of easing: a fifth of the remaining angle, but never a crawl. */
+    private static float ease(float d) {
+        float step = d * 0.2f;
+        if (Math.abs(step) < 0.4f) step = Math.signum(d) * 0.4f;
+        if (Math.abs(step) > Math.abs(d)) step = d;
+        return step;
+    }
+
+    private static float wrapDeg(float a) {
+        a %= 360f;
+        if (a >= 180f) a -= 360f;
+        if (a < -180f) a += 360f;
+        return a;
     }
 }
