@@ -60,3 +60,4 @@ jobs:
         with:
           files: dist/*.jar
           generate_release_notes: true
+
