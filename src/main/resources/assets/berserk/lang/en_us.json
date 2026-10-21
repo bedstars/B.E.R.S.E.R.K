@@ -1,0 +1,10 @@
+{
+  "key.category.berserk.main": "B.E.R.S.E.R.K",
+  "key.berserk.menu": "Open Menu",
+  "key.berserk.record": "Record / Stop Recording",
+  "key.berserk.play": "Play / Stop Macro",
+  "key.berserk.free": "Free Mouse (toggle)",
+  "key.category.berserk_path.main": "B.E.R.S.E.R.K Path",
+  "key.berserk_path.edit": "Open Path Editor",
+  "key.berserk_path.run": "Start / Stop Path"
+}
