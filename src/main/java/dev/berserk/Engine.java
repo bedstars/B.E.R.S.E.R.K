@@ -30,7 +30,7 @@ import java.util.Set;
 public final class Engine {
     public enum Mode { IDLE, RECORDING, PLAYING }
 
-    private enum Phase { BEGIN, RUN, RECOVER, DELAY }
+    private enum Phase { BEGIN, ALIGN, RUN, RECOVER, DELAY }
 
     public static Mode mode = Mode.IDLE;
     public static Macro macro;
@@ -44,6 +44,8 @@ public final class Engine {
     private static Phase phase = Phase.BEGIN;
     private static int p, evIdx, stall, iteration, failures, phaseTicks, settle, escTries;
     private static double sx, sy, sz, firstX, firstY, firstZ, prevX, prevY, prevZ;
+    private static double tx, tz;
+    private static int alignTicks, alignStable;
     private static boolean haveFirst, havePrev, wasNoScreen = true;
     private static float lastHealth;
     private static final Set<Long> held = new LinkedHashSet<>();
@@ -358,6 +360,7 @@ public final class Engine {
         }
         switch (phase) {
             case BEGIN -> startIteration(mc);
+            case ALIGN -> alignTick(mc);
             case RECOVER -> recoverTick(mc);
             case DELAY -> {
                 status = "next loop in " + Math.max(0, Config.I.loopDelay - phaseTicks) + "t";
@@ -391,6 +394,7 @@ public final class Engine {
                 return;
             }
         }
+        final boolean haveFirstBefore = haveFirst;
         if (!haveFirst) {
             firstX = sx;
             firstY = sy;
@@ -398,6 +402,96 @@ public final class Engine {
             haveFirst = true;
         }
 
+        // line the player up with the recorded start (coords + camera) before the run begins
+        if (Config.I.mAlign) {
+            boolean haveTarget = true;
+            if (Config.I.absolutePos) {
+                tx = f0.x;
+                tz = f0.z;
+            } else if (haveFirstBefore) {
+                tx = firstX;
+                tz = firstZ;
+            } else {
+                haveTarget = false;
+            }
+            applyRot(pl, f0, true);
+            double off = Math.hypot(tx - pl.getX(), tz - pl.getZ());
+            if (haveTarget && off > Config.I.alignTolerance && off <= Math.max(Config.I.startTolerance, 4.0)) {
+                alignTicks = 0;
+                alignStable = 0;
+                phase = Phase.ALIGN;
+                status = "aligning to start";
+                return;
+            }
+        }
+        beginRun(mc);
+    }
+
+    /** Walks (W/A/S/D only, camera stays on the recorded start angle) back onto the recorded start spot. */
+    private static void alignTick(Minecraft mc) {
+        LocalPlayer pl = mc.player;
+        if (Scr.get(mc) != null) { // a menu popped up: let the normal start logic close it
+            releaseMove(mc);
+            phase = Phase.BEGIN;
+            return;
+        }
+        Macro.Frame f0 = macro.frames.get(0);
+        applyRot(pl, f0, true); // camera back to exactly where the recording started
+
+        double tol = Config.I.alignTolerance;
+        net.minecraft.world.phys.Vec3 v = pl.getDeltaMovement();
+        // where the player will coast to if no key is pressed (ground friction ~1.2x velocity)
+        double dx = tx - (pl.getX() + v.x * 1.2);
+        double dz = tz - (pl.getZ() + v.z * 1.2);
+        double rx = tx - pl.getX(), rz = tz - pl.getZ();
+        double dist = Math.hypot(rx, rz);
+        double speed = Math.hypot(v.x, v.z);
+
+        if (dist <= tol && speed < 0.02) {
+            if (++alignStable >= 2) {
+                releaseMove(mc);
+                beginRun(mc);
+                return;
+            }
+        } else {
+            alignStable = 0;
+        }
+        if (++alignTicks > Config.I.alignTimeout) { // could not get there (blocked?) - run anyway, Setback Guard decides
+            releaseMove(mc);
+            beginRun(mc);
+            return;
+        }
+
+        double yaw = Math.toRadians(pl.getYRot());
+        double fx = -Math.sin(yaw), fz = Math.cos(yaw);   // forward
+        double rgx = -Math.cos(yaw), rgz = -Math.sin(yaw); // player's right
+        double fwd = dx * fx + dz * fz;
+        double rgt = dx * rgx + dz * rgz;
+        double thr = Math.max(0.02, tol * 0.7);
+
+        mc.options.keyUp.setDown(fwd > thr);
+        mc.options.keyDown.setDown(fwd < -thr);
+        mc.options.keyRight.setDown(rgt > thr);
+        mc.options.keyLeft.setDown(rgt < -thr);
+        mc.options.keyShift.setDown(dist < 0.7); // sneak for the last bit = fine control
+        mc.options.keySprint.setDown(false);
+        status = String.format(Locale.ROOT, "aligning (%.2f off)", dist);
+    }
+
+    private static void releaseMove(Minecraft mc) {
+        mc.options.keyUp.setDown(false);
+        mc.options.keyDown.setDown(false);
+        mc.options.keyLeft.setDown(false);
+        mc.options.keyRight.setDown(false);
+        mc.options.keyShift.setDown(false);
+    }
+
+    private static void beginRun(Minecraft mc) {
+        LocalPlayer pl = mc.player;
+        Macro.Frame f0 = macro.frames.get(0);
+        sx = pl.getX();
+        sy = pl.getY();
+        sz = pl.getZ();
         p = 0;
         evIdx = 0;
         stall = 0;

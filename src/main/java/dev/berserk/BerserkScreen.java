@@ -89,6 +89,7 @@ public final class BerserkScreen extends Screen {
         mods.add(new Mod("Chat Buttons", "MENU / REC / PLAY buttons while the chat box is open.", Ui.CHAT, () -> Config.I.mChatButtons, v -> Config.I.mChatButtons = v));
         mods.add(new Mod("Loop Macro", "Repeat the macro again and again (set the count in SETTINGS).", Ui.LOOP, () -> Config.I.mLoop, v -> Config.I.mLoop = v));
         mods.add(new Mod("Start Check", "Verify you are at the recorded start spot before each run.", Ui.TARGET, () -> Config.I.mStartCheck, v -> Config.I.mStartCheck = v));
+        mods.add(new Mod("Auto Align", "Before each loop, walk back to the recorded start spot and snap the camera to the start angle.", Ui.TARGET, () -> Config.I.mAlign, v -> Config.I.mAlign = v));
     }
 
     private void buildRows() {
@@ -100,6 +101,7 @@ public final class BerserkScreen extends Screen {
         rows.add(new Num("Max drift (blocks)", () -> Config.I.maxDrift, v -> Config.I.maxDrift = v, 1, 50, 0.5, false));
         rows.add(new Num("Setback distance", () -> Config.I.setbackDist, v -> Config.I.setbackDist = v, 0.5, 20, 0.5, false));
         rows.add(new Num("Start tolerance", () -> Config.I.startTolerance, v -> Config.I.startTolerance = v, 0.5, 50, 0.5, false));
+        rows.add(new Num("Align tolerance", () -> Config.I.alignTolerance, v -> Config.I.alignTolerance = v, 0.02, 1, 0.02, false));
         rows.add(new Num("Damage threshold", () -> Config.I.damageThreshold, v -> Config.I.damageThreshold = v, 0.5, 20, 0.5, false));
         rows.add(new Tog("Absolute positions", () -> Config.I.absolutePos, v -> Config.I.absolutePos = v));
     }

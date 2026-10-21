@@ -23,6 +23,8 @@ public final class Config {
     public double startTolerance = 4.0;
     public double damageThreshold = 4.0;
     public boolean absolutePos = true;
+    public double alignTolerance = 0.1; // blocks; how close the auto-align gets you to the recorded start
+    public int alignTimeout = 80;       // ticks before auto-align gives up and just runs
     public static final int SLOTS = 5;
     public String[] slots = {"", "", "", "", ""};     // macro file name stored in each slot
     public boolean[] randSel = new boolean[SLOTS];    // slots included in the randomizer
@@ -43,6 +45,7 @@ public final class Config {
     public boolean mChatButtons = true;
     public boolean mLoop = true;
     public boolean mStartCheck = true;
+    public boolean mAlign = true;
 
     public static Path dir() {
         try {
