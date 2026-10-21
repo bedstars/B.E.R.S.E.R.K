@@ -1,5 +1,6 @@
 package dev.berserk.path;
 
+import dev.berserk.Scr;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
@@ -406,7 +407,7 @@ public final class PathScreen extends Screen {
     private void run() {
         Minecraft mc = Minecraft.getInstance();
         Route.save();
-        mc.setScreen(null);
+        Scr.set(mc, null);
         Walker.start(mc);
     }
 
@@ -490,7 +491,7 @@ public final class PathScreen extends Screen {
                     sel = -1;
                     selSeg = -1;
                 } else if (props) props = false;
-                else Minecraft.getInstance().setScreen(null);
+                else Scr.set(Minecraft.getInstance(), null);
             }
             case GLFW.GLFW_KEY_F8, GLFW.GLFW_KEY_O -> {
                 if (rep) return;

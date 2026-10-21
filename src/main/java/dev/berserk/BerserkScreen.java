@@ -309,7 +309,7 @@ public final class BerserkScreen extends Screen {
             if (in(mx, my, rndX, y + 4, 28, 14)) hoverDesc = "Include this slot in the randomizer.";
 
             // REC into this slot
-            button(g, recX, y + 4, 30, 14, recHere ? "STOP" : "REC", null, recHere ? Ui.STOP : 0xFFB01B2E, () -> {
+            button(g, recX, y + 4, 30, 14, recHere ? "STOP" : "REC", null, 0xFFB01B2E, () -> {
                 commit();
                 Minecraft mc = Minecraft.getInstance();
                 if (Engine.mode == Engine.Mode.RECORDING) {
@@ -320,7 +320,7 @@ public final class BerserkScreen extends Screen {
                     Config.save();
                     Engine.macro = null;
                     Engine.toggleRecord(mc);
-                    mc.setScreen(null);
+                    Scr.set(mc, null);
                 } else {
                     Engine.toggleRecord(mc); // prints "stop the macro first"
                 }
@@ -383,13 +383,13 @@ public final class BerserkScreen extends Screen {
         button(g, cx, y, bw, 18, "OPEN EDITOR", Ui.TARGET, Ui.CARD_HI, () -> {
             commit();
             Minecraft m = Minecraft.getInstance();
-            if (m.player != null && m.level != null) m.setScreen(new PathScreen());
+            if (m.player != null && m.level != null) Scr.set(m, new PathScreen());
         });
-        button(g, cx + bw + 6, y, bw, 18, run ? "STOP PATH" : "RUN PATH", run ? Ui.STOP : Ui.PLAY, run ? Ui.STOP : 0xFF1F8F52, () -> {
+        button(g, cx + bw + 6, y, bw, 18, run ? "STOP PATH" : "RUN PATH", run ? Ui.STOP : Ui.PLAY, run ? 0xFFB01B2E : 0xFF1F8F52, () -> {
             commit();
             Minecraft m = Minecraft.getInstance();
             Walker.toggle(m);
-            if (Walker.running) m.setScreen(null);
+            if (Walker.running) Scr.set(m, null);
         });
         if (in(mx, my, cx, y, bw, 18)) hoverDesc = "Draw a route on a 1000 x 1000 block grid and pick one of 5 route slots.";
         if (in(mx, my, cx + bw + 6, y, bw, 18)) hoverDesc = "Walk the current route with W A S D only. Cannot run together with a macro.";
@@ -514,7 +514,7 @@ public final class BerserkScreen extends Screen {
 
     private void closeMenu() {
         commit();
-        Minecraft.getInstance().setScreen(null);
+        Scr.set(Minecraft.getInstance(), null);
     }
 
     // ------------------------------------------------------------------ input (called from Input)

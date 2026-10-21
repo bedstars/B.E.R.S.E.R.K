@@ -68,7 +68,7 @@ public final class Engine {
             return;
         }
 
-        if (Config.I.mSprint && mc.screen == null && mc.options.keyUp.isDown()) {
+        if (Config.I.mSprint && Scr.get(mc) == null && mc.options.keyUp.isDown()) {
             mc.options.keySprint.setDown(true);
         }
 
@@ -78,7 +78,7 @@ public final class Engine {
 
     public static void onEndTick(Minecraft mc) {
         if (mode != Mode.PLAYING || phase != Phase.RUN || macro == null) return;
-        if (mc.screen instanceof BerserkScreen) return;
+        if (Scr.get(mc) instanceof BerserkScreen) return;
         List<Macro.Ev> ev = macro.events;
         while (evIdx < ev.size() && ev.get(evIdx).t <= p) fire(mc, ev.get(evIdx++));
     }
@@ -86,8 +86,8 @@ public final class Engine {
     // ================================================================== UI actions
 
     public static void toggleMenu(Minecraft mc) {
-        if (mc.screen instanceof BerserkScreen) mc.setScreen(null);
-        else if (mc.screen == null || mc.screen instanceof ChatScreen) mc.setScreen(new BerserkScreen());
+        if (Scr.get(mc) instanceof BerserkScreen) Scr.set(mc, null);
+        else if (Scr.get(mc) == null || Scr.get(mc) instanceof ChatScreen) Scr.set(mc, new BerserkScreen());
     }
 
     public static void toggleRecord(Minecraft mc) {
@@ -136,7 +136,7 @@ public final class Engine {
     }
 
     static String screenName(Minecraft mc) {
-        Screen s = mc.screen;
+        Screen s = Scr.get(mc);
         if (s == null || s instanceof BerserkScreen) return "";
         return s.getClass().getSimpleName();
     }
@@ -159,7 +159,7 @@ public final class Engine {
     private static void recordTick(Minecraft mc) {
         recTick++;
         rec.frames.add(sample(mc));
-        if (mc.screen != null && !(mc.screen instanceof BerserkScreen)) {
+        if (Scr.get(mc) != null && !(Scr.get(mc) instanceof BerserkScreen)) {
             double[] c = Input.cursor();
             int[] w = Input.winSize();
             double fx = c[0] / w[0], fy = c[1] / w[1];
@@ -333,7 +333,7 @@ public final class Engine {
         held.clear();
         status = "starting";
         Msg.overlay(mc, Msg.S + "a\u25b6 Playing " + Msg.S + "f" + m.name);
-        if (mc.screen instanceof BerserkScreen) mc.setScreen(null);
+        if (Scr.get(mc) instanceof BerserkScreen) Scr.set(mc, null);
     }
 
     static void stopPlayback(Minecraft mc, String why, boolean runCommand) {
@@ -352,7 +352,7 @@ public final class Engine {
     }
 
     private static void playTick(Minecraft mc) {
-        if (mc.screen instanceof BerserkScreen) {
+        if (Scr.get(mc) instanceof BerserkScreen) {
             status = "paused (menu open)";
             return;
         }
@@ -368,7 +368,7 @@ public final class Engine {
     }
 
     private static void startIteration(Minecraft mc) {
-        if (mc.screen != null) { // a menu is still open: press ESC until it is gone (not counted as a failure)
+        if (Scr.get(mc) != null) { // a menu is still open: press ESC until it is gone (not counted as a failure)
             phase = Phase.RECOVER;
             phaseTicks = 0;
             settle = 0;
@@ -413,7 +413,7 @@ public final class Engine {
 
     private static void runTick(Minecraft mc) {
         LocalPlayer pl = mc.player;
-        boolean noScreen = mc.screen == null;
+        boolean noScreen = Scr.get(mc) == null;
         if (noScreen && !wasNoScreen) reapplyHeld(); // vanilla re-polls keys when a screen closes
         wasNoScreen = noScreen;
 
@@ -428,7 +428,7 @@ public final class Engine {
             havePrev = false;
             status = "waiting for " + (f.screen.isEmpty() ? "menu to close" : f.screen);
             if (++stall > Config.I.screenTimeout) {
-                fail(mc, "expected " + (f.screen.isEmpty() ? "no screen" : f.screen) + " but got " + (mc.screen == null ? "none" : screenName(mc)));
+                fail(mc, "expected " + (f.screen.isEmpty() ? "no screen" : f.screen) + " but got " + (Scr.get(mc) == null ? "none" : screenName(mc)));
             }
             return;
         }
@@ -534,7 +534,7 @@ public final class Engine {
 
     private static void recoverTick(Minecraft mc) {
         phaseTicks++;
-        if (mc.screen != null) {
+        if (Scr.get(mc) != null) {
             settle = 0;
             if (phaseTicks % 3 == 1) {
                 Input.tapKey(256); // ESC
@@ -557,7 +557,7 @@ public final class Engine {
             }
             case Macro.CHAR -> Input.synChar(e.a);
             case Macro.MOUSE -> {
-                if (mc.screen != null) Input.synCursorFrac(e.fx, e.fy);
+                if (Scr.get(mc) != null) Input.synCursorFrac(e.fx, e.fy);
                 Input.synMouse(e.a, e.c, e.d);
                 long k = (1L << 32) | (e.a & 0xFFFFFFFFL);
                 if (e.c == 1) held.add(k);
@@ -565,7 +565,7 @@ public final class Engine {
             }
             case Macro.SCROLL -> Input.synScroll(e.fx, e.fy);
             case Macro.CURSOR -> {
-                if (mc.screen != null) Input.synCursorFrac(e.fx, e.fy);
+                if (Scr.get(mc) != null) Input.synCursorFrac(e.fx, e.fy);
             }
             default -> {
             }

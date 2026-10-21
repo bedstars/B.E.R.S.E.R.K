@@ -200,7 +200,7 @@ public final class Input {
     static void resync() {
         if (!installed) return;
         Minecraft mc = Minecraft.getInstance();
-        if (mc.screen == null) GLFW.glfwSetCursorPos(window, lastX, lastY);
+        if (Scr.get(mc) == null) GLFW.glfwSetCursorPos(window, lastX, lastY);
     }
 
     // ------------------------------------------------------------------ free mouse
@@ -211,7 +211,7 @@ public final class Input {
             GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_NORMAL);
             Msg.overlay(mc, Msg.S + "bMouse freed " + Msg.S + "7- real mouse input is ignored by the game");
         } else {
-            if (mc.screen == null && mc.mouseHandler.isMouseGrabbed()) {
+            if (Scr.get(mc) == null && mc.mouseHandler.isMouseGrabbed()) {
                 GLFW.glfwSetInputMode(window, GLFW.GLFW_CURSOR, GLFW.GLFW_CURSOR_DISABLED);
                 resync();
             }
@@ -239,7 +239,7 @@ public final class Input {
     private static boolean handleKey(int key, int sc, int action, int mods) {
         Minecraft mc = Minecraft.getInstance();
         boolean inWorld = mc.player != null && mc.level != null;
-        Screen s = mc.screen;
+        Screen s = Scr.get(mc);
         BerserkScreen bs = s instanceof BerserkScreen b ? b : null;
         boolean capturing = bs != null && bs.capturing();
 
@@ -304,7 +304,7 @@ public final class Input {
 
     private static boolean handleChar(int cp) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.screen instanceof BerserkScreen bs) {
+        if (Scr.get(mc) instanceof BerserkScreen bs) {
             bs.onChar(cp);
             return true;
         }
@@ -327,7 +327,7 @@ public final class Input {
         if (action == GLFW.GLFW_RELEASE && consumedButtons.remove(button)) return true;
 
         double[] g = gui();
-        if (action == GLFW.GLFW_PRESS && button == 0 && mc.screen instanceof ChatScreen
+        if (action == GLFW.GLFW_PRESS && button == 0 && Scr.get(mc) instanceof ChatScreen
                 && Config.I.mChatButtons && mc.player != null) {
             int hit = Hud.hit(g[0], g[1]);
             if (hit >= 0) {
@@ -337,7 +337,7 @@ public final class Input {
             }
         }
 
-        if (mc.screen instanceof BerserkScreen bs) {
+        if (Scr.get(mc) instanceof BerserkScreen bs) {
             if (action == GLFW.GLFW_PRESS) bs.onClick(g[0], g[1], button);
             return true;
         }
@@ -355,7 +355,7 @@ public final class Input {
     private static void onScroll(long w, double dx, double dy) {
         try {
             Minecraft mc = Minecraft.getInstance();
-            if (mc.screen instanceof BerserkScreen bs) {
+            if (Scr.get(mc) instanceof BerserkScreen bs) {
                 bs.onScroll(dy);
                 return;
             }
@@ -370,7 +370,7 @@ public final class Input {
     private static void onCursor(long w, double x, double y) {
         try {
             Minecraft mc = Minecraft.getInstance();
-            if (!(mc.screen instanceof BerserkScreen) && blockMouse()) return;
+            if (!(Scr.get(mc) instanceof BerserkScreen) && blockMouse()) return;
         } catch (Throwable t) {
             Berserk.LOG.warn("cursor hook", t);
         }

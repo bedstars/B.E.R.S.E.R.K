@@ -1,5 +1,6 @@
 package dev.berserk.path;
 
+import dev.berserk.Scr;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.*;
 
@@ -84,7 +85,7 @@ public final class PathInput {
     }
 
     private static PathScreen screen() {
-        return Minecraft.getInstance().screen instanceof PathScreen ps ? ps : null;
+        return Scr.get(Minecraft.getInstance()) instanceof PathScreen ps ? ps : null;
     }
 
     // ------------------------------------------------------------------ callbacks

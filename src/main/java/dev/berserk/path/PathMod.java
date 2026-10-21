@@ -1,5 +1,6 @@
 package dev.berserk.path;
 
+import dev.berserk.Scr;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
@@ -47,7 +48,7 @@ public final class PathMod {
 
     private static void onEndTick(Minecraft mc) {
         while (K_EDIT.consumeClick()) {
-            if (mc.player != null && mc.level != null && mc.screen == null) mc.setScreen(new PathScreen());
+            if (mc.player != null && mc.level != null && Scr.get(mc) == null) Scr.set(mc, new PathScreen());
         }
         while (K_RUN.consumeClick()) {
             if (mc.player != null && mc.level != null) Walker.toggle(mc);

@@ -1,5 +1,6 @@
 package dev.berserk.path;
 
+import dev.berserk.Scr;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.phys.Vec3;
 
@@ -169,7 +170,7 @@ public final class Walker {
         }
 
         // any screen (chat, inventory, the editor...) pauses the walk and lets go of the keys
-        if (mc.screen != null) {
+        if (Scr.get(mc) != null) {
             paused = true;
             release(mc);
             return;

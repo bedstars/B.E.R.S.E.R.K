@@ -68,7 +68,7 @@ final class Hud {
             Ui.text(g, t, 11, y + 3, Ui.TEXT);
         }
 
-        if (mc.screen instanceof ChatScreen && Config.I.mChatButtons) {
+        if (Scr.get(mc) instanceof ChatScreen && Config.I.mChatButtons) {
             double[] m = Input.gui();
             int h = hit(m[0], m[1]);
             boolean rec = Engine.mode == Engine.Mode.RECORDING;
