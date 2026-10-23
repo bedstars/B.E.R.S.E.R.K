@@ -41,10 +41,10 @@ They share one menu, one install and one set of key binds, and they never run at
 | | |
 |---|---|
 | **Total recording** | Keys, mouse buttons, scroll wheel, typed characters, cursor position inside menus, and menu open / close timing |
-| **Camera-accurate playback** | Absolute per-tick yaw / pitch, shortest-path interpolation (no 360 degree spins), no dependence on mouse DPI or FPS |
+| **Camera-accurate playback** | Absolute per-tick yaw / pitch, re-evaluated every rendered frame on an overshoot-free curve (as smooth as a real mouse at your FPS), shortest-path (no 360 degree spins), no dependence on mouse DPI |
 | **5 macro slots** | Record five different macros, each saved to its own slot and kept between sessions. REC on a slot records straight into it |
 | **Randomizer** | Tick any slots and turn Randomize on: every time a macro finishes, a random ticked one plays next. Off = only the selected slot runs |
-| **Auto Align** | Before every loop the player walks back onto the exact recorded start spot (W/A/S/D) and the camera snaps to the start angle, so small drift never breaks the loop |
+| **Auto Align** | Before every loop the player walks back onto the exact recorded start spot (W/A/S/D) and the camera eases (never snaps) to the start angle, so small drift never breaks the loop and Randomize never jerks the view |
 | **Loops** | Endless or a fixed count, with a configurable delay between runs |
 | **Failsafes** | Presses `ESC` to leave stray menus, waits for expected screens, detects setbacks, drifting and damage, retries, then gives up cleanly |
 | **Stop-and-run-a-command** | After too many failed attempts the macro halts and runs a command you set in the menu (`/home`, `/spawn`, `/hub` ...) |

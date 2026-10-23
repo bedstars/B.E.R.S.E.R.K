@@ -24,13 +24,19 @@ import java.util.Set;
  *   START of tick k : sample world state  -> frames[k]      (position, camera yaw/pitch, screen)
  *   between ticks   : real input events   -> events with t = k
  *   playback        : START of tick p sets the camera to frames[p]; END of tick p fires events t<=p.
- * The camera is replayed from absolute samples and the game interpolates between them, so mouse
- * movement never has to be "simulated".
+ * The camera is replayed from absolute samples. Between two samples it is NOT left to the game's own
+ * 20 Hz interpolation (vanilla resets the previous rotation at the start of every tick, which makes a
+ * scripted camera move in 20 fps steps): the view is re-evaluated every rendered frame on a smooth,
+ * overshoot-free curve through the samples, so it looks exactly like a real mouse at your real FPS.
+ * Turning to the start angle of a macro (e.g. when Randomize picks another one) is eased the same way
+ * instead of snapping.
  */
 public final class Engine {
     public enum Mode { IDLE, RECORDING, PLAYING }
 
-    private enum Phase { BEGIN, ALIGN, RUN, RECOVER, DELAY }
+    private enum Phase { BEGIN, ALIGN, TURN, RUN, RECOVER, DELAY }
+
+    private static final int CAM_NONE = 0, CAM_RUN = 1, CAM_TURN = 2;
 
     public static Mode mode = Mode.IDLE;
     public static Macro macro;
@@ -49,6 +55,13 @@ public final class Engine {
     private static boolean haveFirst, havePrev, wasNoScreen = true;
     private static float lastHealth;
     private static final Set<Long> held = new LinkedHashSet<>();
+
+    // ---- smooth camera state
+    private static int camMode = CAM_NONE;              // what the per-frame driver should do right now
+    private static float[] camYaw, camPitch, camYawM, camPitchM; // unwrapped samples + tangents of the playing macro
+    private static boolean turning;                     // an eased turn towards the macro's start angle is running
+    private static int turnN, turnDur;
+    private static float tyFrom, tyTo, tpFrom, tpTo;
     private static String status = "Idle";
 
     private static Field pauseField;
@@ -79,10 +92,17 @@ public final class Engine {
     }
 
     public static void onEndTick(Minecraft mc) {
-        if (mode != Mode.PLAYING || phase != Phase.RUN || macro == null) return;
-        if (Scr.get(mc) instanceof BerserkScreen) return;
-        List<Macro.Ev> ev = macro.events;
-        while (evIdx < ev.size() && ev.get(evIdx).t <= p) fire(mc, ev.get(evIdx++));
+        if (mode != Mode.PLAYING) return;
+        if (phase == Phase.RUN && macro != null && !(Scr.get(mc) instanceof BerserkScreen)) {
+            List<Macro.Ev> ev = macro.events;
+            while (evIdx < ev.size() && ev.get(evIdx).t <= p) fire(mc, ev.get(evIdx++));
+        }
+        drive(mc); // the tick frame itself must already show the in-between angle, not the raw sample
+    }
+
+    /** Called once per rendered frame (from the HUD hook). Moves the camera smoothly between the tick samples. */
+    public static void onFrame(Minecraft mc) {
+        drive(mc);
     }
 
     // ================================================================== UI actions
@@ -327,6 +347,8 @@ public final class Engine {
         }
         macro = m;
         mode = Mode.PLAYING;
+        camMode = CAM_NONE;
+        turning = false;
         phase = Phase.BEGIN;
         iteration = 0;
         failures = 0;
@@ -341,6 +363,8 @@ public final class Engine {
     static void stopPlayback(Minecraft mc, String why, boolean runCommand) {
         if (mode != Mode.PLAYING) return;
         mode = Mode.IDLE;
+        camMode = CAM_NONE;
+        turning = false;
         releaseHeld();
         KeyMapping.releaseAll();
         Input.resync();
@@ -354,6 +378,7 @@ public final class Engine {
     }
 
     private static void playTick(Minecraft mc) {
+        camMode = CAM_NONE; // every branch below says again if the camera should keep moving this tick
         if (Scr.get(mc) instanceof BerserkScreen) {
             status = "paused (menu open)";
             return;
@@ -361,6 +386,7 @@ public final class Engine {
         switch (phase) {
             case BEGIN -> startIteration(mc);
             case ALIGN -> alignTick(mc);
+            case TURN -> turnPhaseTick(mc);
             case RECOVER -> recoverTick(mc);
             case DELAY -> {
                 status = "next loop in " + Math.max(0, Config.I.loopDelay - phaseTicks) + "t";
@@ -402,7 +428,10 @@ public final class Engine {
             haveFirst = true;
         }
 
-        // line the player up with the recorded start (coords + camera) before the run begins
+        // line the player up with the recorded start (coords + camera) before the run begins.
+        // The camera is never snapped: it is eased to the start angle (see turnBegin), also when
+        // Randomize just switched to a macro that starts somewhere else.
+        boolean walk = false;
         if (Config.I.mAlign) {
             boolean haveTarget = true;
             if (Config.I.absolutePos) {
@@ -414,15 +443,21 @@ public final class Engine {
             } else {
                 haveTarget = false;
             }
-            applyRot(pl, f0, true);
             double off = Math.hypot(tx - pl.getX(), tz - pl.getZ());
-            if (haveTarget && off > Config.I.alignTolerance && off <= Math.max(Config.I.startTolerance, 4.0)) {
-                alignTicks = 0;
-                alignStable = 0;
-                phase = Phase.ALIGN;
-                status = "aligning to start";
-                return;
-            }
+            walk = haveTarget && off > Config.I.alignTolerance && off <= Math.max(Config.I.startTolerance, 4.0);
+        }
+        turnBegin(pl, f0);
+        if (walk) {
+            alignTicks = 0;
+            alignStable = 0;
+            phase = Phase.ALIGN;
+            status = "aligning to start";
+            return;
+        }
+        if (turning) {
+            phase = Phase.TURN;
+            status = "turning to start";
+            return;
         }
         beginRun(mc);
     }
@@ -435,8 +470,7 @@ public final class Engine {
             phase = Phase.BEGIN;
             return;
         }
-        Macro.Frame f0 = macro.frames.get(0);
-        applyRot(pl, f0, true); // camera back to exactly where the recording started
+        boolean stillTurning = turnStep(mc); // camera eases back to where the recording started
 
         double tol = Config.I.alignTolerance;
         net.minecraft.world.phys.Vec3 v = pl.getDeltaMovement();
@@ -448,7 +482,7 @@ public final class Engine {
         double speed = Math.hypot(v.x, v.z);
 
         if (dist <= tol && speed < 0.02) {
-            if (++alignStable >= 2) {
+            if (++alignStable >= 2 && !stillTurning) {
                 releaseMove(mc);
                 beginRun(mc);
                 return;
@@ -456,7 +490,7 @@ public final class Engine {
         } else {
             alignStable = 0;
         }
-        if (++alignTicks > Config.I.alignTimeout) { // could not get there (blocked?) - run anyway, Setback Guard decides
+        if (++alignTicks > Config.I.alignTimeout && !stillTurning) { // could not get there (blocked?) - run anyway, Setback Guard decides
             releaseMove(mc);
             beginRun(mc);
             return;
@@ -476,6 +510,16 @@ public final class Engine {
         mc.options.keyShift.setDown(dist < 0.7); // sneak for the last bit = fine control
         mc.options.keySprint.setDown(false);
         status = String.format(Locale.ROOT, "aligning (%.2f off)", dist);
+    }
+
+    /** Only the camera still has to get to the start angle (no walking needed). */
+    private static void turnPhaseTick(Minecraft mc) {
+        if (Scr.get(mc) != null) { // a menu popped up: let the normal start logic close it
+            turning = false;
+            phase = Phase.BEGIN;
+            return;
+        }
+        if (!turnStep(mc)) beginRun(mc);
     }
 
     private static void releaseMove(Minecraft mc) {
@@ -500,7 +544,10 @@ public final class Engine {
         lastHealth = pl.getHealth();
         held.clear();
         KeyMapping.releaseAll();
-        applyRot(pl, f0, true);
+        turning = false;
+        applyRot(pl, f0, true); // the eased turn already got here, this only removes a sub-degree remainder
+        buildCam(macro);
+        camMode = CAM_RUN;      // p == 0: the view now glides from frame 0 towards frame 1
         phase = Phase.RUN;
         status = "running";
     }
@@ -528,7 +575,10 @@ public final class Engine {
         }
         stall = 0;
         p = next;
-        if (noScreen) applyRot(pl, f, false);
+        if (noScreen) {
+            applyRot(pl, f, false);
+            camMode = CAM_RUN; // glide from this sample towards the next one until the next tick
+        }
 
         double ax = pl.getX(), ay = pl.getY(), az = pl.getZ();
 
@@ -694,6 +744,111 @@ public final class Engine {
         pl.xRotO = snap ? np : cp;
         pl.setYRot(ny);
         pl.setXRot(np);
+    }
+
+    // ================================================================== smooth camera
+
+    /** Sets what the camera shows right now. Old == new, so the game cannot add its own 20 Hz stepping on top. */
+    private static void setView(LocalPlayer pl, float yaw, float pitch) {
+        float cy = pl.getYRot();
+        float ny = cy + wrap(yaw - cy);
+        float np = Math.max(-90f, Math.min(90f, pitch));
+        pl.setYRot(ny);
+        pl.setXRot(np);
+        pl.yRotO = ny;
+        pl.xRotO = np;
+    }
+
+    /** Per-frame driver: evaluates the camera at (tick + partial tick). */
+    private static void drive(Minecraft mc) {
+        if (mode != Mode.PLAYING || camMode == CAM_NONE) return;
+        LocalPlayer pl = mc.player;
+        if (pl == null || Scr.get(mc) != null) return;
+        float pt = Math.max(0f, Math.min(1f, mc.getDeltaTracker().getGameTimeDeltaPartialTick(false)));
+        if (camMode == CAM_RUN) {
+            if (camYaw == null || p < 0 || p >= camYaw.length) return;
+            setView(pl, hermite(camYaw, camYawM, p, pt), hermite(camPitch, camPitchM, p, pt));
+        } else {
+            double s = Math.min(1.0, (turnN + pt) / (double) Math.max(1, turnDur));
+            float e = ease(s);
+            setView(pl, tyFrom + (tyTo - tyFrom) * e, tpFrom + (tpTo - tpFrom) * e);
+        }
+    }
+
+    /** Plans an eased, human-looking turn from the current camera to the start angle of the macro. */
+    private static void turnBegin(LocalPlayer pl, Macro.Frame f0) {
+        float cy = pl.getYRot(), cp = pl.getXRot();
+        float dy = wrap(f0.yaw - cy);
+        float tp = Math.max(-90f, Math.min(90f, f0.pitch));
+        double ang = Math.hypot(dy, tp - cp);
+        if (ang < 0.3) {
+            turning = false;
+            return;
+        }
+        tyFrom = cy;
+        tyTo = cy + dy;
+        tpFrom = cp;
+        tpTo = tp;
+        double dur = (7 + ang * 0.17) * (0.85 + 0.3 * RNG.nextDouble()) * Math.max(0.3, Config.I.turnScale);
+        turnDur = (int) Math.round(Math.max(5, Math.min(34, dur)));
+        turnN = 0;
+        turning = true;
+    }
+
+    /** One tick of the turn. Returns true while the turn is still going. */
+    private static boolean turnStep(Minecraft mc) {
+        if (!turning || mc.player == null) return false;
+        turnN++;
+        float e = ease(Math.min(1.0, turnN / (double) turnDur));
+        setView(mc.player, tyFrom + (tyTo - tyFrom) * e, tpFrom + (tpTo - tpFrom) * e);
+        camMode = CAM_TURN;
+        if (turnN >= turnDur) {
+            turning = false;
+            return false;
+        }
+        return true;
+    }
+
+    /** Smootherstep: starts and ends at rest, like a hand settling on a target. */
+    private static float ease(double s) {
+        s = Math.max(0, Math.min(1, s));
+        return (float) (s * s * s * (s * (s * 6 - 15) + 10));
+    }
+
+    /** Unwraps yaw (no 360 jumps) and prepares monotone cubic tangents, so the curve never overshoots an angle. */
+    private static void buildCam(Macro m) {
+        int n = m.frames.size();
+        camYaw = new float[n];
+        camPitch = new float[n];
+        for (int i = 0; i < n; i++) {
+            Macro.Frame f = m.frames.get(i);
+            camYaw[i] = i == 0 ? f.yaw : camYaw[i - 1] + wrap(f.yaw - m.frames.get(i - 1).yaw);
+            camPitch[i] = Math.max(-90f, Math.min(90f, f.pitch));
+        }
+        camYawM = tangents(camYaw);
+        camPitchM = tangents(camPitch);
+    }
+
+    private static float[] tangents(float[] a) {
+        int n = a.length;
+        float[] m = new float[n];
+        if (n < 2) return m;
+        m[0] = a[1] - a[0];
+        m[n - 1] = a[n - 1] - a[n - 2];
+        for (int k = 1; k < n - 1; k++) {
+            float d0 = a[k] - a[k - 1], d1 = a[k + 1] - a[k];
+            m[k] = d0 * d1 <= 0 ? 0f : 2f * d0 * d1 / (d0 + d1); // harmonic mean = no overshoot
+        }
+        return m;
+    }
+
+    /** Cubic Hermite between sample i and i+1 at s in [0,1]. */
+    private static float hermite(float[] a, float[] m, int i, float s) {
+        int n = a.length;
+        if (i >= n - 1) return a[n - 1];
+        float s2 = s * s, s3 = s2 * s;
+        return (2 * s3 - 3 * s2 + 1) * a[i] + (s3 - 2 * s2 + s) * m[i]
+                + (-2 * s3 + 3 * s2) * a[i + 1] + (s3 - s2) * m[i + 1];
     }
 
     private static float wrap(float a) {

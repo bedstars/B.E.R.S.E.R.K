@@ -25,6 +25,7 @@ public final class Config {
     public boolean absolutePos = true;
     public double alignTolerance = 0.1; // blocks; how close the auto-align gets you to the recorded start
     public int alignTimeout = 80;       // ticks before auto-align gives up and just runs
+    public double turnScale = 1.0;      // 1 = normal speed of the eased turn to a macro's start angle; higher = slower
     public static final int SLOTS = 5;
     public String[] slots = {"", "", "", "", ""};     // macro file name stored in each slot
     public boolean[] randSel = new boolean[SLOTS];    // slots included in the randomizer

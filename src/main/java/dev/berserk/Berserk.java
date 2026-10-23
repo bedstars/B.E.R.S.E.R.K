@@ -31,7 +31,11 @@ public final class Berserk implements ClientModInitializer {
         ClientTickEvents.START_CLIENT_TICK.register(Engine::onStartTick);
         ClientTickEvents.END_CLIENT_TICK.register(Engine::onEndTick);
 
-        HudElementRegistry.addLast(Identifier.fromNamespaceAndPath(ID, "overlay"), (graphics, tickCounter) -> Hud.draw(graphics));
+        HudElementRegistry.addLast(Identifier.fromNamespaceAndPath(ID, "overlay"), (graphics, tickCounter) -> {
+            Hud.draw(graphics);
+            // once per rendered frame: keeps the macro camera moving smoothly between the 20 Hz ticks
+            Engine.onFrame(net.minecraft.client.Minecraft.getInstance());
+        });
 
         // registered AFTER our own tick hook on purpose: the Path editor's GLFW hook is installed last,
         // so it sees raw keys first (its F8 Ortho never collides with the macro Play key).
